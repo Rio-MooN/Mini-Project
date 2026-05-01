@@ -1,9 +1,9 @@
+---
 name: Documentation
 description: 문서 작성 또는 수정 요청
 title: "[Docs] "
 labels: ["docs"]
 assignees: []
-
 ---
 
 ## 📌 문서 목적

@@ -1,9 +1,9 @@
+---
 name: Task
 description: 일반 작업
 title: "[Task] "
 labels: ["task"]
 assignees: []
-
 ---
 
 ## 📌 작업 내용

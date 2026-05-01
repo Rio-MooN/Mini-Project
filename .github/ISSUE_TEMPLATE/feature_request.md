@@ -1,9 +1,9 @@
+---
 name: Feature Request
 description: 새로운 기능 추가
 title: "[Feature] "
 labels: ["feature"]
 assignees: []
-
 ---
 
 ## 📌 개요

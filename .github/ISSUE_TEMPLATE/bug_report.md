@@ -1,9 +1,9 @@
+---
 name: Bug Report
 description: 버그 발생 시 작성
 title: "[Bug] "
 labels: ["bug"]
 assignees: []
-
 ---
 
 ## 🐛 버그 설명
