@@ -1,0 +1,174 @@
+@Logic
+script GameManager extends Logic
+
+    -- 게임 상태 enum 역할 (문자열로 관리)
+    -- "IDLE" | "BATTLE" | "CLEAR" | "GAMEOVER"
+    @Sync
+    property string GameState = "IDLE"
+
+    @Sync
+    property integer BossCurrentHp = 0
+
+    @Sync
+    property integer BossMaxHp = 1000
+
+    @Sync
+    property integer BossPhase = 1
+
+    @Sync
+    property boolean IsBattleActive = false
+
+    -- 내부용 타이머 ID
+    property any _phaseCheckTimer = nil
+
+    -- =====================
+    -- 라이프사이클
+    -- =====================
+
+    @ExecSpace("ServerOnly")
+    method void OnBeginPlay()
+        -- GameManager 초기화. 서버에서만 실행.
+        log("[GameManager] OnBeginPlay - 서버 초기화")
+        self.GameState = "IDLE"
+        self.BossPhase = 1
+        self.IsBattleActive = false
+    end
+
+    @ExecSpace("ServerOnly")
+    method void OnEndPlay()
+        -- 타이머 정리
+        if self._phaseCheckTimer ~= nil then
+            _TimerService:ClearTimer(self._phaseCheckTimer)
+            self._phaseCheckTimer = nil
+        end
+        log("[GameManager] OnEndPlay")
+    end
+
+    -- =====================
+    -- 전투 시작 / 종료
+    -- =====================
+
+    @ExecSpace("ServerOnly")
+    method void StartBattle(integer bossMaxHp)
+        -- 전투를 시작한다. BossController에서 호출.
+        -- @param bossMaxHp : 보스 최대 HP
+        if self.IsBattleActive then
+            log_warning("[GameManager] 이미 전투 중입니다.")
+            return
+        end
+
+        log("[GameManager] 전투 시작! BossMaxHp=" .. tostring(bossMaxHp))
+        self.BossMaxHp = bossMaxHp
+        self.BossCurrentHp = bossMaxHp
+        self.BossPhase = 1
+        self.IsBattleActive = true
+        self.GameState = "BATTLE"
+
+        -- 페이즈 체크 타이머 (0.5초마다)
+        self._phaseCheckTimer = _TimerService:SetTimerRepeat(function()
+            self:_CheckPhase()
+        end, 0.5)
+    end
+
+    @ExecSpace("ServerOnly")
+    method void EndBattle(boolean isVictory)
+        -- 전투를 종료한다.
+        -- @param isVictory : true=클리어, false=게임오버
+        if not self.IsBattleActive then
+            return
+        end
+
+        self.IsBattleActive = false
+
+        if self._phaseCheckTimer ~= nil then
+            _TimerService:ClearTimer(self._phaseCheckTimer)
+            self._phaseCheckTimer = nil
+        end
+
+        if isVictory then
+            self.GameState = "CLEAR"
+            log("[GameManager] 전투 클리어!")
+        else
+            self.GameState = "GAMEOVER"
+            log("[GameManager] 게임 오버!")
+        end
+    end
+
+    -- =====================
+    -- 보스 HP 업데이트
+    -- =====================
+
+    @ExecSpace("ServerOnly")
+    method void OnBossHit(integer damage)
+        -- 보스가 피격될 때 BossController에서 호출.
+        -- @param damage : 받은 데미지
+        if not self.IsBattleActive then return end
+
+        self.BossCurrentHp = self.BossCurrentHp - damage
+        if self.BossCurrentHp < 0 then
+            self.BossCurrentHp = 0
+        end
+
+        log("[GameManager] 보스 HP: " .. tostring(self.BossCurrentHp) .. "/" .. tostring(self.BossMaxHp))
+
+        if self.BossCurrentHp <= 0 then
+            self:EndBattle(true)
+        end
+    end
+
+    -- =====================
+    -- 플레이어 사망
+    -- =====================
+
+    @ExecSpace("ServerOnly")
+    method void OnPlayerDead()
+        -- 플레이어가 사망했을 때 PlayerHit에서 호출.
+        if not self.IsBattleActive then return end
+        log("[GameManager] 플레이어 사망 → 게임 오버")
+        self:EndBattle(false)
+    end
+
+    -- =====================
+    -- 내부: 페이즈 체크
+    -- =====================
+
+    @ExecSpace("ServerOnly")
+    method void _CheckPhase()
+        -- 매 0.5초마다 보스 HP 비율 확인 후 페이즈 전환.
+        if not self.IsBattleActive then return end
+        if self.BossMaxHp <= 0 then return end
+
+        local ratio = self.BossCurrentHp / self.BossMaxHp
+
+        if self.BossPhase == 1 and ratio <= 0.5 then
+            self.BossPhase = 2
+            log("[GameManager] 페이즈 2 전환! (HP " .. tostring(math.floor(ratio * 100)) .. "%)")
+            -- BossController가 @Sync BossPhase를 감지해서 패턴 변경
+        end
+    end
+
+    -- =====================
+    -- 상태 쿼리 (클라이언트/서버 공용)
+    -- =====================
+
+    method boolean IsIdle()
+        -- 현재 IDLE 상태인지 반환.
+        return self.GameState == "IDLE"
+    end
+
+    method boolean IsBattle()
+        -- 현재 BATTLE 상태인지 반환.
+        return self.GameState == "BATTLE"
+    end
+
+    method boolean IsClear()
+        -- 현재 CLEAR 상태인지 반환.
+        return self.GameState == "CLEAR"
+    end
+
+    method boolean IsGameOver()
+        -- 현재 GAMEOVER 상태인지 반환.
+        return self.GameState == "GAMEOVER"
+    end
+
+end

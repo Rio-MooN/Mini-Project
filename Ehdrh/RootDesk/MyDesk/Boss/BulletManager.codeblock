@@ -1,0 +1,205 @@
+{
+  "Id": "",
+  "GameId": "",
+  "EntryKey": "codeblock://b215f2a1-88f3-4c3f-a32b-3879829a159c",
+  "ContentType": "x-mod/codeblock",
+  "Content": "",
+  "Usage": 0,
+  "UsePublish": 1,
+  "UseService": 0,
+  "CoreVersion": "26.3.0.0",
+  "StudioVersion": "0.1.0.0",
+  "DynamicLoading": 0,
+  "ContentProto": {
+    "Use": "Json",
+    "Json": {
+      "CoreVersion": {
+        "Major": 0,
+        "Minor": 2
+      },
+      "ScriptVersion": {
+        "Major": 1,
+        "Minor": 1
+      },
+      "Description": "",
+      "Id": "b215f2a1-88f3-4c3f-a32b-3879829a159c",
+      "Language": 1,
+      "Name": "BulletManager",
+      "Type": 5,
+      "Source": 0,
+      "Target": null,
+      "Properties": [
+        {
+          "Type": "string",
+          "DefaultValue": "\"playerbullet\"",
+          "SyncDirection": 0,
+          "Attributes": [],
+          "Name": "PlayerBulletModelId"
+        },
+        {
+          "Type": "string",
+          "DefaultValue": "\"bossbullet\"",
+          "SyncDirection": 0,
+          "Attributes": [],
+          "Name": "BossBulletModelId"
+        },
+        {
+          "Type": "integer",
+          "DefaultValue": "0",
+          "SyncDirection": 0,
+          "Attributes": [],
+          "Name": "_bulletCount"
+        }
+      ],
+      "Methods": [
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [],
+          "Code": "        -- BulletManager 초기화\n        log(\"[BulletManager] OnBeginPlay\")\n        self._bulletCount = 0",
+          "Scope": 2,
+          "ExecSpace": 1,
+          "Attributes": [],
+          "Name": "OnBeginPlay"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [
+            {
+              "Type": "number",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "x"
+            },
+            {
+              "Type": "number",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "y"
+            },
+            {
+              "Type": "number",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "dirX"
+            },
+            {
+              "Type": "number",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "dirY"
+            },
+            {
+              "Type": "number",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "speed"
+            },
+            {
+              "Type": "integer",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "damage"
+            }
+          ],
+          "Code": "        -- 플레이어 투사체 스폰\n        local map = self:_GetCurrentMap()\n        if map == nil then\n            log_warning(\"[BulletManager] 맵을 찾을 수 없음\")\n            return\n        end\n\n        self._bulletCount = self._bulletCount + 1\n        local name = \"PlayerBullet_\" .. tostring(self._bulletCount)\n\n        local bullet = _SpawnService:SpawnByModelId(\n            self.PlayerBulletModelId,\n            name,\n            Vector3(x, y, 0),\n            map\n        )\n\n        if not isvalid(bullet) then\n            log_warning(\"[BulletManager] 플레이어 투사체 스폰 실패\")\n            return\n        end\n\n        local mover = bullet.BulletMover\n        if isvalid(mover) then\n            mover:Init(dirX, dirY, speed, damage, \"player\", 4.0)\n        end",
+          "Scope": 2,
+          "ExecSpace": 1,
+          "Attributes": [],
+          "Name": "SpawnPlayerBullet"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [
+            {
+              "Type": "number",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "x"
+            },
+            {
+              "Type": "number",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "y"
+            },
+            {
+              "Type": "number",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "dirX"
+            },
+            {
+              "Type": "number",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "dirY"
+            },
+            {
+              "Type": "number",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "speed"
+            },
+            {
+              "Type": "integer",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "damage"
+            }
+          ],
+          "Code": "        -- 보스 투사체 스폰\n        local map = self:_GetCurrentMap()\n        if map == nil then\n            log_warning(\"[BulletManager] 맵을 찾을 수 없음\")\n            return\n        end\n\n        self._bulletCount = self._bulletCount + 1\n        local name = \"BossBullet_\" .. tostring(self._bulletCount)\n\n        local bullet = _SpawnService:SpawnByModelId(\n            self.BossBulletModelId,\n            name,\n            Vector3(x, y, 0),\n            map\n        )\n\n        if not isvalid(bullet) then\n            log_warning(\"[BulletManager] 보스 투사체 스폰 실패\")\n            return\n        end\n\n        local mover = bullet.BulletMover\n        if isvalid(mover) then\n            mover:Init(dirX, dirY, speed, damage, \"boss\", 5.0)\n        end",
+          "Scope": 2,
+          "ExecSpace": 1,
+          "Attributes": [],
+          "Name": "SpawnBossBullet"
+        },
+        {
+          "Return": {
+            "Type": "any",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [],
+          "Code": "        -- 현재 맵 엔티티 반환 (EntityService:GetEntityByPath 사용)\n        local map = _EntityService:GetEntityByPath(\"/maps/map01\")\n        if isvalid(map) then\n            return map\n        end\n        log_warning(\"[BulletManager] /maps/map01 을 찾을 수 없음\")\n        return nil",
+          "Scope": 2,
+          "ExecSpace": 1,
+          "Attributes": [],
+          "Name": "_GetCurrentMap"
+        }
+      ],
+      "EntityEventHandlers": []
+    }
+  }
+}

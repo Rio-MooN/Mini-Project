@@ -1,0 +1,255 @@
+{
+  "Id": "",
+  "GameId": "",
+  "EntryKey": "codeblock://8532e869-216e-4eb6-968b-ac260370cac3",
+  "ContentType": "x-mod/codeblock",
+  "Content": "",
+  "Usage": 0,
+  "UsePublish": 1,
+  "UseService": 0,
+  "CoreVersion": "26.3.0.0",
+  "StudioVersion": "0.1.0.0",
+  "DynamicLoading": 0,
+  "ContentProto": {
+    "Use": "Json",
+    "Json": {
+      "CoreVersion": {
+        "Major": 0,
+        "Minor": 2
+      },
+      "ScriptVersion": {
+        "Major": 1,
+        "Minor": 1
+      },
+      "Description": "",
+      "Id": "8532e869-216e-4eb6-968b-ac260370cac3",
+      "Language": 1,
+      "Name": "PlayerController",
+      "Type": 1,
+      "Source": 0,
+      "Target": null,
+      "Properties": [
+        {
+          "Type": "integer",
+          "DefaultValue": "1000",
+          "SyncDirection": 3,
+          "Attributes": [],
+          "Name": "MaxHp"
+        },
+        {
+          "Type": "integer",
+          "DefaultValue": "1000",
+          "SyncDirection": 3,
+          "Attributes": [],
+          "Name": "CurrentHp"
+        },
+        {
+          "Type": "number",
+          "DefaultValue": "1.5",
+          "SyncDirection": 0,
+          "Attributes": [],
+          "Name": "ImmuneCooldown"
+        },
+        {
+          "Type": "number",
+          "DefaultValue": "0.3",
+          "SyncDirection": 0,
+          "Attributes": [],
+          "Name": "FireCooldown"
+        },
+        {
+          "Type": "number",
+          "DefaultValue": "8.0",
+          "SyncDirection": 0,
+          "Attributes": [],
+          "Name": "BulletSpeed"
+        },
+        {
+          "Type": "integer",
+          "DefaultValue": "50",
+          "SyncDirection": 0,
+          "Attributes": [],
+          "Name": "BulletDamage"
+        }
+      ],
+      "Methods": [
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [],
+          "Code": "        -- 초기화\n        self._T.lastHitTime = 0\n        self._T.lastFireTime = 0\n\n        if self:IsServer() then\n            log(\"[PlayerController] OnBeginPlay (Server)\")\n            self.CurrentHp = self.MaxHp\n            self._T.hitHandler = self.Entity:ConnectEvent(HitEvent, self._OnHitEvent)\n        end\n\n        if self:IsClient() then\n            self._T.isLocalPlayer = (_UserService.LocalPlayer == self.Entity)\n            log(\"[PlayerController] OnBeginPlay (Client) isLocal=\" .. tostring(self._T.isLocalPlayer))\n        end",
+          "Scope": 2,
+          "ExecSpace": 0,
+          "Attributes": [],
+          "Name": "OnBeginPlay"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [],
+          "Code": "        -- 이벤트 해제\n        if self:IsServer() then\n            if self._T.hitHandler ~= nil then\n                self.Entity:DisconnectEvent(HitEvent, self._T.hitHandler)\n                self._T.hitHandler = nil\n            end\n        end\n        log(\"[PlayerController] OnEndPlay\")",
+          "Scope": 2,
+          "ExecSpace": 0,
+          "Attributes": [],
+          "Name": "OnEndPlay"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [
+            {
+              "Type": "number",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "delta"
+            }
+          ],
+          "Code": "        -- 로컬 플레이어만 발사 처리\n        if not self._T.isLocalPlayer then return end\n        if not _GameManager:IsBattle() then return end\n        self:_HandleFire(delta)",
+          "Scope": 2,
+          "ExecSpace": 2,
+          "Attributes": [],
+          "Name": "OnUpdate"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [
+            {
+              "Type": "number",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "delta"
+            }
+          ],
+          "Code": "        -- IsKeyPressed로 현재 키 눌림 상태 확인 후 발사\n        local now = _UtilLogic.ElapsedSeconds\n        if now - self._T.lastFireTime < self.FireCooldown then return end\n\n        local dx = 0\n        local dy = 0\n        if _InputService:IsKeyPressed(KeyboardKey.RightArrow) then dx = dx + 1 end\n        if _InputService:IsKeyPressed(KeyboardKey.LeftArrow)  then dx = dx - 1 end\n        if _InputService:IsKeyPressed(KeyboardKey.UpArrow)    then dy = dy + 1 end\n        if _InputService:IsKeyPressed(KeyboardKey.DownArrow)  then dy = dy - 1 end\n\n        if dx == 0 and dy == 0 then return end\n\n        if dx ~= 0 and dy ~= 0 then\n            dx = dx * 0.7071\n            dy = dy * 0.7071\n        end\n\n        self._T.lastFireTime = now\n        self:RequestFire(dx, dy)",
+          "Scope": 2,
+          "ExecSpace": 2,
+          "Attributes": [],
+          "Name": "_HandleFire"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [
+            {
+              "Type": "number",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "dirX"
+            },
+            {
+              "Type": "number",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "dirY"
+            }
+          ],
+          "Code": "        -- 클라이언트 → 서버: 투사체 발사 요청\n        if not _GameManager:IsBattle() then return end\n        local pos = self.Entity.TransformComponent.WorldPosition\n        _BulletManager:SpawnPlayerBullet(pos.x, pos.y, dirX, dirY, self.BulletSpeed, self.BulletDamage)",
+          "Scope": 2,
+          "ExecSpace": 5,
+          "Attributes": [],
+          "Name": "RequestFire"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [
+            {
+              "Type": "HitEvent",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "event"
+            }
+          ],
+          "Code": "        -- 피격 처리: 무적 프레임 체크 후 HP 감소\n        if not _GameManager:IsBattle() then return end\n\n        local now = _UtilLogic.ElapsedSeconds\n        if now - self._T.lastHitTime < self.ImmuneCooldown then return end\n\n        self._T.lastHitTime = now\n        local damage = event.TotalDamage\n        self.CurrentHp = self.CurrentHp - damage\n        log(\"[PlayerController] 피격! HP=\" .. tostring(self.CurrentHp))\n\n        if self.CurrentHp <= 0 then\n            self.CurrentHp = 0\n            self.Entity.PlayerComponent:ProcessDead()\n            _GameManager:OnPlayerDead()\n        end",
+          "Scope": 2,
+          "ExecSpace": 1,
+          "Attributes": [],
+          "Name": "_OnHitEvent"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [
+            {
+              "Type": "integer",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "damage"
+            }
+          ],
+          "Code": "        -- 보스 투사체 직접 피격 처리\n        if not _GameManager:IsBattle() then return end\n\n        local now = _UtilLogic.ElapsedSeconds\n        if now - self._T.lastHitTime < self.ImmuneCooldown then return end\n\n        self._T.lastHitTime = now\n        self.CurrentHp = self.CurrentHp - damage\n        log(\"[PlayerController] 보스 투사체 피격! HP=\" .. tostring(self.CurrentHp))\n\n        if self.CurrentHp <= 0 then\n            self.CurrentHp = 0\n            self.Entity.PlayerComponent:ProcessDead()\n            _GameManager:OnPlayerDead()\n        end",
+          "Scope": 2,
+          "ExecSpace": 1,
+          "Attributes": [],
+          "Name": "_OnBossHit"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [
+            {
+              "Type": "integer",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "amount"
+            }
+          ],
+          "Code": "        -- HP 회복\n        self.CurrentHp = self.CurrentHp + amount\n        if self.CurrentHp > self.MaxHp then\n            self.CurrentHp = self.MaxHp\n        end",
+          "Scope": 2,
+          "ExecSpace": 1,
+          "Attributes": [],
+          "Name": "Heal"
+        }
+      ],
+      "EntityEventHandlers": []
+    }
+  }
+}

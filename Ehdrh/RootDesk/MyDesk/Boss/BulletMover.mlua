@@ -1,0 +1,175 @@
+@Component
+script BulletMover extends Component
+
+    -- =====================
+    -- 내부 상태 (_T)
+    -- =====================
+    -- self._T.dirX, dirY  : 이동 방향
+    -- self._T.speed       : 이동 속도
+    -- self._T.damage      : 데미지
+    -- self._T.owner       : "player" | "boss"
+    -- self._T.lifetime    : 최대 수명 (초)
+    -- self._T.age         : 현재 경과 시간
+    -- self._T.initialized : Init 호출 여부
+
+    -- =====================
+    -- 초기화 (스폰 직후 BulletManager가 호출)
+    -- =====================
+
+    @ExecSpace("ServerOnly")
+    method void Init(number dirX, number dirY, number speed, integer damage, string owner, number lifetime)
+        -- 투사체를 초기화한다. SpawnByModelId 직후 반드시 호출.
+        -- @param dirX, dirY : 이동 방향 (정규화됨)
+        -- @param speed      : 이동 속도 (월드유닛/초)
+        -- @param damage     : 충돌 시 데미지
+        -- @param owner      : "player" | "boss"
+        -- @param lifetime   : 자동 소멸 시간 (초)
+        self._T.dirX = dirX
+        self._T.dirY = dirY
+        self._T.speed = speed
+        self._T.damage = damage
+        self._T.owner = owner
+        self._T.lifetime = lifetime
+        self._T.age = 0
+        self._T.initialized = true
+
+        -- 스프라이트 방향 설정
+        local renderer = self.Entity.SpriteRendererComponent
+        if isvalid(renderer) then
+            renderer.FlipX = (dirX > 0)
+        end
+    end
+
+    -- =====================
+    -- 매 프레임 이동
+    -- =====================
+
+    @ExecSpace("ServerOnly")
+    method void OnUpdate(number delta)
+        -- Body 없는 투사체: TransformComponent:Translate로 이동.
+        if not self._T.initialized then return end
+        if not _GameManager:IsBattle() then
+            self:_Destroy()
+            return
+        end
+
+        -- 수명 체크
+        self._T.age = self._T.age + delta
+        if self._T.age >= self._T.lifetime then
+            self:_Destroy()
+            return
+        end
+
+        -- 이동 (Body 없음 → Translate 직접)
+        local transform = self.Entity.TransformComponent
+        transform:Translate(
+            self._T.dirX * self._T.speed * delta,
+            self._T.dirY * self._T.speed * delta
+        )
+
+        -- 충돌 체크 (간단한 거리 기반)
+        self:_CheckCollision()
+    end
+
+    -- =====================
+    -- 충돌 체크
+    -- =====================
+
+    @ExecSpace("ServerOnly")
+    method void _CheckCollision()
+        -- 투사체 owner에 따라 다른 대상과 충돌 체크.
+        local myPos = self.Entity.TransformComponent.WorldPosition
+        local hitRadius = 0.4
+
+        if self._T.owner == "player" then
+            -- 플레이어 투사체 → 보스와 충돌
+            self:_CheckHitBoss(myPos, hitRadius)
+        else
+            -- 보스 투사체 → 플레이어와 충돌
+            self:_CheckHitPlayers(myPos, hitRadius)
+        end
+    end
+
+    @ExecSpace("ServerOnly")
+    method void _CheckHitBoss(any myPos, number radius)
+        -- 보스 엔티티와 거리 체크.
+        local bosses = _EntityService:GetEntitiesSpawnedByModelId("bossentity")
+        if bosses == nil then return end
+
+        for _, boss in pairs(bosses) do
+            if isvalid(boss) then
+                local bPos = boss.TransformComponent.WorldPosition
+                local dx = bPos.x - myPos.x
+                local dy = bPos.y - myPos.y
+                local dist = math.sqrt(dx*dx + dy*dy)
+
+                if dist <= radius + 0.5 then
+                    -- 보스 피격
+                    _GameManager:OnBossHit(self._T.damage)
+                    self:_OnHitEffect(myPos)
+                    self:_Destroy()
+                    return
+                end
+            end
+        end
+    end
+
+    @ExecSpace("ServerOnly")
+    method void _CheckHitPlayers(any myPos, number radius)
+        -- 모든 플레이어와 거리 체크.
+        local users = _UserService.UserEntities
+        for userId, playerEntity in pairs(users) do
+            if isvalid(playerEntity) then
+                local pPos = playerEntity.TransformComponent.WorldPosition
+                local dx = pPos.x - myPos.x
+                local dy = pPos.y - myPos.y
+                local dist = math.sqrt(dx*dx + dy*dy)
+
+                if dist <= radius + 0.35 then
+                    -- 플레이어 피격
+                    local pc = playerEntity.PlayerController
+                    if isvalid(pc) then
+                        pc:_OnBossHit(self._T.damage)
+                    end
+                    self:_OnHitEffect(myPos)
+                    self:_Destroy()
+                    return
+                end
+            end
+        end
+    end
+
+    -- =====================
+    -- 피격 이펙트 (클라이언트)
+    -- =====================
+
+    @ExecSpace("Client")
+    method void _OnHitEffect(any pos)
+        -- 투사체 충돌 시 파티클 재생.
+        local mapEntity = self.Entity.CurrentMap
+        if not isvalid(mapEntity) then return end
+
+        _ParticleService:PlayBasicParticle(
+            BasicParticleType.SparkExplosion,
+            mapEntity,
+            Vector3(pos.x, pos.y, 0),
+            0,
+            Vector3(0.5, 0.5, 0.5),
+            false,
+            {}
+        )
+    end
+
+    -- =====================
+    -- 투사체 소멸
+    -- =====================
+
+    @ExecSpace("ServerOnly")
+    method void _Destroy()
+        -- 투사체 엔티티를 안전하게 제거한다.
+        if isvalid(self.Entity) then
+            _EntityService:Destroy(self.Entity)
+        end
+    end
+
+end

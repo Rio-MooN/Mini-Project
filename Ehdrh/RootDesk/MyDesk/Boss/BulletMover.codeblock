@@ -1,0 +1,223 @@
+{
+  "Id": "",
+  "GameId": "",
+  "EntryKey": "codeblock://2f5aafaa-ac9a-45b8-99d8-af4d52e1eebe",
+  "ContentType": "x-mod/codeblock",
+  "Content": "",
+  "Usage": 0,
+  "UsePublish": 1,
+  "UseService": 0,
+  "CoreVersion": "26.3.0.0",
+  "StudioVersion": "0.1.0.0",
+  "DynamicLoading": 0,
+  "ContentProto": {
+    "Use": "Json",
+    "Json": {
+      "CoreVersion": {
+        "Major": 0,
+        "Minor": 2
+      },
+      "ScriptVersion": {
+        "Major": 1,
+        "Minor": 1
+      },
+      "Description": "",
+      "Id": "2f5aafaa-ac9a-45b8-99d8-af4d52e1eebe",
+      "Language": 1,
+      "Name": "BulletMover",
+      "Type": 1,
+      "Source": 0,
+      "Target": null,
+      "Properties": [],
+      "Methods": [
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [],
+          "Code": "        -- 초기화 (Init 호출 전까지 대기)\n        self._T.initialized = false\n        self._T.dirX = 0\n        self._T.dirY = 0\n        self._T.speed = 5.0\n        self._T.damage = 10\n        self._T.owner = \"boss\"\n        self._T.lifetime = 5.0\n        self._T.age = 0",
+          "Scope": 2,
+          "ExecSpace": 0,
+          "Attributes": [],
+          "Name": "OnBeginPlay"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [
+            {
+              "Type": "number",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "dirX"
+            },
+            {
+              "Type": "number",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "dirY"
+            },
+            {
+              "Type": "number",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "speed"
+            },
+            {
+              "Type": "integer",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "damage"
+            },
+            {
+              "Type": "string",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "owner"
+            },
+            {
+              "Type": "number",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "lifetime"
+            }
+          ],
+          "Code": "        -- 투사체 초기화. SpawnByModelId 직후 BulletManager가 호출.\n        self._T.dirX = dirX\n        self._T.dirY = dirY\n        self._T.speed = speed\n        self._T.damage = damage\n        self._T.owner = owner\n        self._T.lifetime = lifetime\n        self._T.age = 0\n        self._T.initialized = true",
+          "Scope": 2,
+          "ExecSpace": 1,
+          "Attributes": [],
+          "Name": "Init"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [
+            {
+              "Type": "number",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "delta"
+            }
+          ],
+          "Code": "        -- 매 프레임 이동 및 충돌 체크\n        if not self._T.initialized then return end\n        if not _GameManager:IsBattle() then\n            self:_Destroy()\n            return\n        end\n\n        -- 수명 체크\n        self._T.age = self._T.age + delta\n        if self._T.age >= self._T.lifetime then\n            self:_Destroy()\n            return\n        end\n\n        -- Body 없는 엔티티 → TransformComponent:Translate로 이동\n        self.Entity.TransformComponent:Translate(\n            self._T.dirX * self._T.speed * delta,\n            self._T.dirY * self._T.speed * delta\n        )\n\n        -- 충돌 체크\n        self:_CheckCollision()",
+          "Scope": 2,
+          "ExecSpace": 1,
+          "Attributes": [],
+          "Name": "OnUpdate"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [],
+          "Code": "        -- owner에 따라 충돌 대상 결정\n        local myPos = self.Entity.TransformComponent.WorldPosition\n        local hitRadius = 0.4\n\n        if self._T.owner == \"player\" then\n            self:_CheckHitBoss(myPos, hitRadius)\n        else\n            self:_CheckHitPlayers(myPos, hitRadius)\n        end",
+          "Scope": 2,
+          "ExecSpace": 1,
+          "Attributes": [],
+          "Name": "_CheckCollision"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [
+            {
+              "Type": "any",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "myPos"
+            },
+            {
+              "Type": "number",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "radius"
+            }
+          ],
+          "Code": "        -- 보스 엔티티와 거리 체크\n        local bosses = _EntityService:GetEntitiesSpawnedByModelId(self._T.bossModelId or \"bossentity\")\n        if bosses == nil then return end\n\n        for k, boss in pairs(bosses) do\n            if isvalid(boss) then\n                local bPos = boss.TransformComponent.WorldPosition\n                local dx = bPos.x - myPos.x\n                local dy = bPos.y - myPos.y\n                local dist = math.sqrt(dx * dx + dy * dy)\n\n                if dist <= radius + 0.5 then\n                    _GameManager:OnBossHit(self._T.damage)\n                    self:_Destroy()\n                    return\n                end\n            end\n        end",
+          "Scope": 2,
+          "ExecSpace": 1,
+          "Attributes": [],
+          "Name": "_CheckHitBoss"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [
+            {
+              "Type": "any",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "myPos"
+            },
+            {
+              "Type": "number",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "radius"
+            }
+          ],
+          "Code": "        -- 플레이어와 거리 체크\n        local users = _UserService.UserEntities\n        for userId, playerEntity in pairs(users) do\n            if isvalid(playerEntity) then\n                local pPos = playerEntity.TransformComponent.WorldPosition\n                local dx = pPos.x - myPos.x\n                local dy = pPos.y - myPos.y\n                local dist = math.sqrt(dx * dx + dy * dy)\n\n                if dist <= radius + 0.35 then\n                    local pc = playerEntity.PlayerController\n                    if isvalid(pc) then\n                        pc:_OnBossHit(self._T.damage)\n                    end\n                    self:_Destroy()\n                    return\n                end\n            end\n        end",
+          "Scope": 2,
+          "ExecSpace": 1,
+          "Attributes": [],
+          "Name": "_CheckHitPlayers"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [],
+          "Code": "        -- 투사체 제거\n        if isvalid(self.Entity) then\n            _EntityService:Destroy(self.Entity)\n        end",
+          "Scope": 2,
+          "ExecSpace": 1,
+          "Attributes": [],
+          "Name": "_Destroy"
+        }
+      ],
+      "EntityEventHandlers": []
+    }
+  }
+}

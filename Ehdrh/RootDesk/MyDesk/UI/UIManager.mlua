@@ -1,0 +1,202 @@
+@Logic
+script UIManager extends Logic
+
+    -- =====================
+    -- UI 엔티티 참조 (UUID를 에디터에서 연결)
+    -- =====================
+
+    -- 플레이어 HP 슬라이더
+    property SliderComponent PlayerHpSlider = ""
+
+    -- 보스 HP 슬라이더
+    property SliderComponent BossHpSlider = ""
+
+    -- 클리어 패널 그룹
+    property Entity ClearPanel = ""
+
+    -- 게임오버 패널 그룹
+    property Entity GameOverPanel = ""
+
+    -- 페이즈 표시 텍스트
+    property TextComponent PhaseText = ""
+
+    -- 보스 HP 텍스트
+    property TextComponent BossHpText = ""
+
+    -- 플레이어 HP 텍스트
+    property TextComponent PlayerHpText = ""
+
+    -- =====================
+    -- 내부 상태
+    -- =====================
+    -- self._T.prevGameState : 이전 GameState (변경 감지용)
+    -- self._T.prevPhase     : 이전 페이즈
+
+    -- =====================
+    -- 라이프사이클 (클라이언트 전용)
+    -- =====================
+
+    @ExecSpace("ClientOnly")
+    method void OnBeginPlay()
+        -- UI 초기화: 패널 숨기기, 슬라이더 초기값 설정.
+        log("[UIManager] OnBeginPlay")
+        self._T.prevGameState = ""
+        self._T.prevPhase = 1
+
+        -- 초기 숨김
+        self:_HideAllPanels()
+
+        -- 슬라이더 초기값
+        if isvalid(self.PlayerHpSlider) then
+            self.PlayerHpSlider.Value = 1.0
+        end
+        if isvalid(self.BossHpSlider) then
+            self.BossHpSlider.Value = 1.0
+        end
+    end
+
+    @ExecSpace("ClientOnly")
+    method void OnUpdate(number delta)
+        -- 매 프레임 UI 갱신.
+        self:_UpdateHpBars()
+        self:_CheckStateChange()
+    end
+
+    -- =====================
+    -- HP 바 갱신
+    -- =====================
+
+    @ExecSpace("ClientOnly")
+    method void _UpdateHpBars()
+        -- GameManager의 @Sync 값으로 HP바 갱신.
+
+        -- 보스 HP
+        if isvalid(self.BossHpSlider) then
+            local maxHp = _GameManager.BossMaxHp
+            local curHp = _GameManager.BossCurrentHp
+            if maxHp > 0 then
+                local ratio = curHp / maxHp
+                self.BossHpSlider.Value = ratio
+
+                -- HP 색상 변경
+                if ratio > 0.5 then
+                    self.BossHpSlider.FillRectColor = Color(0.2, 0.8, 0.2, 1)
+                elseif ratio > 0.25 then
+                    self.BossHpSlider.FillRectColor = Color(1.0, 0.7, 0.0, 1)
+                else
+                    self.BossHpSlider.FillRectColor = Color(0.9, 0.1, 0.1, 1)
+                end
+            end
+        end
+
+        -- 보스 HP 텍스트
+        if isvalid(self.BossHpText) then
+            self.BossHpText.Text = tostring(_GameManager.BossCurrentHp) .. " / " .. tostring(_GameManager.BossMaxHp)
+        end
+
+        -- 플레이어 HP (로컬 플레이어)
+        local localPlayer = _UserService.LocalPlayer
+        if isvalid(localPlayer) then
+            local pc = localPlayer.PlayerController
+            if isvalid(pc) then
+                local ratio = pc.CurrentHp / pc.MaxHp
+                if isvalid(self.PlayerHpSlider) then
+                    self.PlayerHpSlider.Value = ratio
+                end
+                if isvalid(self.PlayerHpText) then
+                    self.PlayerHpText.Text = tostring(pc.CurrentHp) .. " / " .. tostring(pc.MaxHp)
+                end
+            end
+        end
+    end
+
+    -- =====================
+    -- 게임 상태 변경 감지
+    -- =====================
+
+    @ExecSpace("ClientOnly")
+    method void _CheckStateChange()
+        -- GameManager.GameState @Sync 값 변경 감지 후 UI 전환.
+        local state = _GameManager.GameState
+        local phase = _GameManager.BossPhase
+
+        if state ~= self._T.prevGameState then
+            self._T.prevGameState = state
+            self:_OnGameStateChanged(state)
+        end
+
+        if phase ~= self._T.prevPhase then
+            self._T.prevPhase = phase
+            self:_OnPhaseChanged(phase)
+        end
+    end
+
+    @ExecSpace("ClientOnly")
+    method void _OnGameStateChanged(string state)
+        -- 게임 상태 전환 시 해당 UI 패널 표시.
+        log("[UIManager] 상태 변경: " .. state)
+
+        self:_HideAllPanels()
+
+        if state == "CLEAR" then
+            if isvalid(self.ClearPanel) then
+                self.ClearPanel.Enable = true
+            end
+        elseif state == "GAMEOVER" then
+            if isvalid(self.GameOverPanel) then
+                self.GameOverPanel.Enable = true
+            end
+        end
+    end
+
+    @ExecSpace("ClientOnly")
+    method void _OnPhaseChanged(integer phase)
+        -- 페이즈 변경 시 텍스트 갱신 및 연출.
+        log("[UIManager] 페이즈 변경: Phase " .. tostring(phase))
+        if isvalid(self.PhaseText) then
+            self.PhaseText.Text = "Phase " .. tostring(phase)
+        end
+
+        -- Phase 2 돌입 시 경고 메시지 (잠깐 표시)
+        if phase == 2 then
+            self:_ShowPhaseAlert()
+        end
+    end
+
+    -- =====================
+    -- Phase 전환 연출
+    -- =====================
+
+    @ExecSpace("ClientOnly")
+    method void _ShowPhaseAlert()
+        -- Phase 2 진입 알림 텍스트를 2초간 표시.
+        if not isvalid(self.PhaseText) then return end
+
+        local original = self.PhaseText.Text
+        self.PhaseText.Text = "⚠ Phase 2 ⚠"
+        self.PhaseText.FontColor = Color(1, 0.2, 0.2, 1)
+
+        _TimerService:SetTimerOnce(function()
+            if isvalid(self.PhaseText) then
+                self.PhaseText.Text = "Phase 2"
+                self.PhaseText.FontColor = Color(1, 1, 1, 1)
+            end
+        end, 2.0)
+    end
+
+    -- =====================
+    -- 유틸: 모든 패널 숨기기
+    -- =====================
+
+    @ExecSpace("ClientOnly")
+    method void _HideAllPanels()
+        -- 클리어/게임오버 패널을 모두 숨긴다.
+        if isvalid(self.ClearPanel) then
+            self.ClearPanel.Enable = false
+        end
+        if isvalid(self.GameOverPanel) then
+            self.GameOverPanel.Enable = false
+        end
+    end
+
+end

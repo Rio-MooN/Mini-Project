@@ -1,0 +1,267 @@
+{
+  "Id": "",
+  "GameId": "",
+  "EntryKey": "codeblock://091ab488-b8a4-4f2d-9e66-12e2100326da",
+  "ContentType": "x-mod/codeblock",
+  "Content": "",
+  "Usage": 0,
+  "UsePublish": 1,
+  "UseService": 0,
+  "CoreVersion": "26.3.0.0",
+  "StudioVersion": "0.1.0.0",
+  "DynamicLoading": 0,
+  "ContentProto": {
+    "Use": "Json",
+    "Json": {
+      "CoreVersion": {
+        "Major": 0,
+        "Minor": 2
+      },
+      "ScriptVersion": {
+        "Major": 1,
+        "Minor": 1
+      },
+      "Description": "",
+      "Id": "091ab488-b8a4-4f2d-9e66-12e2100326da",
+      "Language": 1,
+      "Name": "BossController",
+      "Type": 1,
+      "Source": 0,
+      "Target": "MOD.Core.AttackComponent",
+      "Properties": [
+        {
+          "Type": "integer",
+          "DefaultValue": "1000",
+          "SyncDirection": 0,
+          "Attributes": [],
+          "Name": "MaxHp"
+        },
+        {
+          "Type": "number",
+          "DefaultValue": "2.0",
+          "SyncDirection": 0,
+          "Attributes": [],
+          "Name": "Phase1AttackCooldown"
+        },
+        {
+          "Type": "number",
+          "DefaultValue": "1.2",
+          "SyncDirection": 0,
+          "Attributes": [],
+          "Name": "Phase2AttackCooldown"
+        },
+        {
+          "Type": "number",
+          "DefaultValue": "1.5",
+          "SyncDirection": 0,
+          "Attributes": [],
+          "Name": "MoveSpeed"
+        }
+      ],
+      "Methods": [
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [],
+          "Code": "        -- 보스 초기화. GameManager에 HP 등록 후 전투 시작.\n        log(\"[BossController] OnBeginPlay\")\n        self._T.lastAttackTime = 0\n        self._T.currentPhase = 1\n\n        if self:IsServer() then\n            _GameManager:StartBattle(self.MaxHp)\n        end",
+          "Scope": 2,
+          "ExecSpace": 0,
+          "Attributes": [],
+          "Name": "OnBeginPlay"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [
+            {
+              "Type": "number",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "delta"
+            }
+          ],
+          "Code": "        -- 전투 중일 때만 AI 실행\n        if not _GameManager:IsBattle() then return end\n        if not isvalid(self.Entity) then return end\n\n        self._T.currentPhase = _GameManager.BossPhase\n\n        self:_MoveTowardPlayer()\n\n        local now = _UtilLogic.ElapsedSeconds\n        local cooldown = self.Phase1AttackCooldown\n        if self._T.currentPhase == 2 then\n            cooldown = self.Phase2AttackCooldown\n        end\n\n        if now - self._T.lastAttackTime >= cooldown then\n            self._T.lastAttackTime = now\n            self:_ExecuteAttackPattern()\n        end",
+          "Scope": 2,
+          "ExecSpace": 1,
+          "Attributes": [],
+          "Name": "OnUpdate"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [],
+          "Code": "        -- 가장 가까운 플레이어를 향해 이동\n        local player = self:_GetNearestPlayer()\n        if player == nil then return end\n\n        local myPos = self.Entity.TransformComponent.WorldPosition\n        local plPos = player.TransformComponent.WorldPosition\n\n        local dx = plPos.x - myPos.x\n        local dy = plPos.y - myPos.y\n        local dist = math.sqrt(dx * dx + dy * dy)\n\n        if dist < 0.5 then return end\n\n        local movement = self.Entity.MovementComponent\n        if not isvalid(movement) then return end\n\n        movement:MoveToDirection(Vector2(dx / dist, dy / dist), 0)",
+          "Scope": 2,
+          "ExecSpace": 1,
+          "Attributes": [],
+          "Name": "_MoveTowardPlayer"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [],
+          "Code": "        -- 페이즈에 따라 공격 패턴 실행\n        if self._T.currentPhase == 1 then\n            self:_AttackPhase1()\n        else\n            self:_AttackPhase2()\n        end",
+          "Scope": 2,
+          "ExecSpace": 1,
+          "Attributes": [],
+          "Name": "_ExecuteAttackPattern"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [],
+          "Code": "        -- Phase 1: 4방향 직선 탄막\n        log(\"[BossController] Phase1 공격\")\n        local pos = self.Entity.TransformComponent.WorldPosition\n\n        local dirs = {\n            {x=1,  y=0},\n            {x=-1, y=0},\n            {x=0,  y=1},\n            {x=0,  y=-1}\n        }\n\n        for i = 1, #dirs do\n            local dir = dirs[i]\n            _BulletManager:SpawnBossBullet(pos.x, pos.y, dir.x, dir.y, 5.0, 30)\n        end",
+          "Scope": 2,
+          "ExecSpace": 1,
+          "Attributes": [],
+          "Name": "_AttackPhase1"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [],
+          "Code": "        -- Phase 2: 8방향 방사형 탄막\n        log(\"[BossController] Phase2 공격\")\n        local pos = self.Entity.TransformComponent.WorldPosition\n\n        local count = 8\n        for i = 0, count - 1 do\n            local angle = (i / count) * 2 * math.pi\n            local dx = math.cos(angle)\n            local dy = math.sin(angle)\n            _BulletManager:SpawnBossBullet(pos.x, pos.y, dx, dy, 6.5, 40)\n        end",
+          "Scope": 2,
+          "ExecSpace": 1,
+          "Attributes": [],
+          "Name": "_AttackPhase2"
+        },
+        {
+          "Return": {
+            "Type": "integer",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [
+            {
+              "Type": "Entity",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "attacker"
+            },
+            {
+              "Type": "Entity",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "defender"
+            },
+            {
+              "Type": "string",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "attackInfo"
+            }
+          ],
+          "Code": "        -- 플레이어 투사체 데미지 계산 (AttackComponent 오버라이드)\n        local damage = tonumber(attackInfo) or 50\n        return damage",
+          "Scope": 2,
+          "ExecSpace": 0,
+          "Attributes": [],
+          "Name": "CalcDamage"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [
+            {
+              "Type": "Entity",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "attacker"
+            },
+            {
+              "Type": "integer",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "damage"
+            },
+            {
+              "Type": "boolean",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "isCritical"
+            },
+            {
+              "Type": "string",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "attackInfo"
+            },
+            {
+              "Type": "integer",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "hitCount"
+            }
+          ],
+          "Code": "        -- 보스 피격 시 GameManager에 데미지 전달\n        log(\"[BossController] 피격! 데미지=\" .. tostring(damage))\n        _GameManager:OnBossHit(damage)\n\n        if _GameManager.BossCurrentHp <= 0 then\n            _TimerService:SetTimerOnce(function()\n                if isvalid(self.Entity) then\n                    _EntityService:Destroy(self.Entity)\n                end\n            end, 1.5)\n        end",
+          "Scope": 2,
+          "ExecSpace": 1,
+          "Attributes": [],
+          "Name": "OnHit"
+        },
+        {
+          "Return": {
+            "Type": "any",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [],
+          "Code": "        -- 가장 가까운 플레이어 반환\n        local myPos = self.Entity.TransformComponent.WorldPosition\n        local nearest = nil\n        local nearestDist = 999999\n\n        local users = _UserService.UserEntities\n        for userId, playerEntity in pairs(users) do\n            if isvalid(playerEntity) then\n                local pPos = playerEntity.TransformComponent.WorldPosition\n                local dx = pPos.x - myPos.x\n                local dy = pPos.y - myPos.y\n                local dist = math.sqrt(dx * dx + dy * dy)\n                if dist < nearestDist then\n                    nearestDist = dist\n                    nearest = playerEntity\n                end\n            end\n        end\n\n        return nearest",
+          "Scope": 2,
+          "ExecSpace": 1,
+          "Attributes": [],
+          "Name": "_GetNearestPlayer"
+        }
+      ],
+      "EntityEventHandlers": []
+    }
+  }
+}

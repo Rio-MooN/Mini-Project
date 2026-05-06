@@ -1,0 +1,269 @@
+{
+  "Id": "",
+  "GameId": "",
+  "EntryKey": "codeblock://eeb39f5d-44e1-46c7-9558-2a1c1544deed",
+  "ContentType": "x-mod/codeblock",
+  "Content": "",
+  "Usage": 0,
+  "UsePublish": 1,
+  "UseService": 0,
+  "CoreVersion": "26.3.0.0",
+  "StudioVersion": "0.1.0.0",
+  "DynamicLoading": 0,
+  "ContentProto": {
+    "Use": "Json",
+    "Json": {
+      "CoreVersion": {
+        "Major": 0,
+        "Minor": 2
+      },
+      "ScriptVersion": {
+        "Major": 1,
+        "Minor": 1
+      },
+      "Description": "",
+      "Id": "eeb39f5d-44e1-46c7-9558-2a1c1544deed",
+      "Language": 1,
+      "Name": "GameManager",
+      "Type": 5,
+      "Source": 0,
+      "Target": null,
+      "Properties": [
+        {
+          "Type": "string",
+          "DefaultValue": "\"IDLE\"",
+          "SyncDirection": 3,
+          "Attributes": [],
+          "Name": "GameState"
+        },
+        {
+          "Type": "integer",
+          "DefaultValue": "0",
+          "SyncDirection": 3,
+          "Attributes": [],
+          "Name": "BossCurrentHp"
+        },
+        {
+          "Type": "integer",
+          "DefaultValue": "1000",
+          "SyncDirection": 3,
+          "Attributes": [],
+          "Name": "BossMaxHp"
+        },
+        {
+          "Type": "integer",
+          "DefaultValue": "1",
+          "SyncDirection": 3,
+          "Attributes": [],
+          "Name": "BossPhase"
+        },
+        {
+          "Type": "boolean",
+          "DefaultValue": "false",
+          "SyncDirection": 3,
+          "Attributes": [],
+          "Name": "IsBattleActive"
+        },
+        {
+          "Type": "any",
+          "DefaultValue": "nil",
+          "SyncDirection": 0,
+          "Attributes": [],
+          "Name": "_phaseCheckTimer"
+        }
+      ],
+      "Methods": [
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [],
+          "Code": "        -- GameManager 초기화. 서버에서만 실행.\n        log(\"[GameManager] OnBeginPlay - 서버 초기화\")\n        self.GameState = \"IDLE\"\n        self.BossPhase = 1\n        self.IsBattleActive = false",
+          "Scope": 2,
+          "ExecSpace": 1,
+          "Attributes": [],
+          "Name": "OnBeginPlay"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [],
+          "Code": "        -- 타이머 정리\n        if self._phaseCheckTimer ~= nil then\n            _TimerService:ClearTimer(self._phaseCheckTimer)\n            self._phaseCheckTimer = nil\n        end\n        log(\"[GameManager] OnEndPlay\")",
+          "Scope": 2,
+          "ExecSpace": 1,
+          "Attributes": [],
+          "Name": "OnEndPlay"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [
+            {
+              "Type": "integer",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "bossMaxHp"
+            }
+          ],
+          "Code": "        -- 전투를 시작한다. BossController에서 호출.\n        -- @param bossMaxHp : 보스 최대 HP\n        if self.IsBattleActive then\n            log_warning(\"[GameManager] 이미 전투 중입니다.\")\n            return\n        end\n\n        log(\"[GameManager] 전투 시작! BossMaxHp=\" .. tostring(bossMaxHp))\n        self.BossMaxHp = bossMaxHp\n        self.BossCurrentHp = bossMaxHp\n        self.BossPhase = 1\n        self.IsBattleActive = true\n        self.GameState = \"BATTLE\"\n\n        -- 페이즈 체크 타이머 (0.5초마다)\n        self._phaseCheckTimer = _TimerService:SetTimerRepeat(function()\n            self:_CheckPhase()\n        end, 0.5)",
+          "Scope": 2,
+          "ExecSpace": 1,
+          "Attributes": [],
+          "Name": "StartBattle"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [
+            {
+              "Type": "boolean",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "isVictory"
+            }
+          ],
+          "Code": "        -- 전투를 종료한다.\n        -- @param isVictory : true=클리어, false=게임오버\n        if not self.IsBattleActive then\n            return\n        end\n\n        self.IsBattleActive = false\n\n        if self._phaseCheckTimer ~= nil then\n            _TimerService:ClearTimer(self._phaseCheckTimer)\n            self._phaseCheckTimer = nil\n        end\n\n        if isVictory then\n            self.GameState = \"CLEAR\"\n            log(\"[GameManager] 전투 클리어!\")\n        else\n            self.GameState = \"GAMEOVER\"\n            log(\"[GameManager] 게임 오버!\")\n        end",
+          "Scope": 2,
+          "ExecSpace": 1,
+          "Attributes": [],
+          "Name": "EndBattle"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [
+            {
+              "Type": "integer",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "damage"
+            }
+          ],
+          "Code": "        -- 보스가 피격될 때 BossController에서 호출.\n        -- @param damage : 받은 데미지\n        if not self.IsBattleActive then return end\n\n        self.BossCurrentHp = self.BossCurrentHp - damage\n        if self.BossCurrentHp < 0 then\n            self.BossCurrentHp = 0\n        end\n\n        log(\"[GameManager] 보스 HP: \" .. tostring(self.BossCurrentHp) .. \"/\" .. tostring(self.BossMaxHp))\n\n        if self.BossCurrentHp <= 0 then\n            self:EndBattle(true)\n        end",
+          "Scope": 2,
+          "ExecSpace": 1,
+          "Attributes": [],
+          "Name": "OnBossHit"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [],
+          "Code": "        -- 플레이어가 사망했을 때 PlayerHit에서 호출.\n        if not self.IsBattleActive then return end\n        log(\"[GameManager] 플레이어 사망 → 게임 오버\")\n        self:EndBattle(false)",
+          "Scope": 2,
+          "ExecSpace": 1,
+          "Attributes": [],
+          "Name": "OnPlayerDead"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [],
+          "Code": "        -- 매 0.5초마다 보스 HP 비율 확인 후 페이즈 전환.\n        if not self.IsBattleActive then return end\n        if self.BossMaxHp <= 0 then return end\n\n        local ratio = self.BossCurrentHp / self.BossMaxHp\n\n        if self.BossPhase == 1 and ratio <= 0.5 then\n            self.BossPhase = 2\n            log(\"[GameManager] 페이즈 2 전환! (HP \" .. tostring(math.floor(ratio * 100)) .. \"%)\")\n            -- BossController가 @Sync BossPhase를 감지해서 패턴 변경\n        end",
+          "Scope": 2,
+          "ExecSpace": 1,
+          "Attributes": [],
+          "Name": "_CheckPhase"
+        },
+        {
+          "Return": {
+            "Type": "boolean",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [],
+          "Code": "        -- 현재 IDLE 상태인지 반환.\n        return self.GameState == \"IDLE\"",
+          "Scope": 2,
+          "ExecSpace": 0,
+          "Attributes": [],
+          "Name": "IsIdle"
+        },
+        {
+          "Return": {
+            "Type": "boolean",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [],
+          "Code": "        -- 현재 BATTLE 상태인지 반환.\n        return self.GameState == \"BATTLE\"",
+          "Scope": 2,
+          "ExecSpace": 0,
+          "Attributes": [],
+          "Name": "IsBattle"
+        },
+        {
+          "Return": {
+            "Type": "boolean",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [],
+          "Code": "        -- 현재 CLEAR 상태인지 반환.\n        return self.GameState == \"CLEAR\"",
+          "Scope": 2,
+          "ExecSpace": 0,
+          "Attributes": [],
+          "Name": "IsClear"
+        },
+        {
+          "Return": {
+            "Type": "boolean",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [],
+          "Code": "        -- 현재 GAMEOVER 상태인지 반환.\n        return self.GameState == \"GAMEOVER\"",
+          "Scope": 2,
+          "ExecSpace": 0,
+          "Attributes": [],
+          "Name": "IsGameOver"
+        }
+      ],
+      "EntityEventHandlers": []
+    }
+  }
+}

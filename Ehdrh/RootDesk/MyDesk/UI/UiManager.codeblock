@@ -1,0 +1,231 @@
+{
+  "Id": "",
+  "GameId": "",
+  "EntryKey": "codeblock://14c96ad3-562d-4099-ae22-d274f01b6448",
+  "ContentType": "x-mod/codeblock",
+  "Content": "",
+  "Usage": 0,
+  "UsePublish": 1,
+  "UseService": 0,
+  "CoreVersion": "26.3.0.0",
+  "StudioVersion": "0.1.0.0",
+  "DynamicLoading": 0,
+  "ContentProto": {
+    "Use": "Json",
+    "Json": {
+      "CoreVersion": {
+        "Major": 0,
+        "Minor": 2
+      },
+      "ScriptVersion": {
+        "Major": 1,
+        "Minor": 1
+      },
+      "Description": "",
+      "Id": "14c96ad3-562d-4099-ae22-d274f01b6448",
+      "Language": 1,
+      "Name": "UiManager",
+      "Type": 5,
+      "Source": 0,
+      "Target": null,
+      "Properties": [
+        {
+          "Type": "Component",
+          "DefaultValue": ":SliderComponent",
+          "SyncDirection": 0,
+          "Attributes": [],
+          "Name": "PlayerHpSlider"
+        },
+        {
+          "Type": "Component",
+          "DefaultValue": ":SliderComponent",
+          "SyncDirection": 0,
+          "Attributes": [],
+          "Name": "BossHpSlider"
+        },
+        {
+          "Type": "Entity",
+          "DefaultValue": "",
+          "SyncDirection": 0,
+          "Attributes": [],
+          "Name": "ClearPanel"
+        },
+        {
+          "Type": "Entity",
+          "DefaultValue": "",
+          "SyncDirection": 0,
+          "Attributes": [],
+          "Name": "GameOverPanel"
+        },
+        {
+          "Type": "Component",
+          "DefaultValue": ":TextComponent",
+          "SyncDirection": 0,
+          "Attributes": [],
+          "Name": "PhaseText"
+        },
+        {
+          "Type": "Component",
+          "DefaultValue": ":TextComponent",
+          "SyncDirection": 0,
+          "Attributes": [],
+          "Name": "BossHpText"
+        },
+        {
+          "Type": "Component",
+          "DefaultValue": ":TextComponent",
+          "SyncDirection": 0,
+          "Attributes": [],
+          "Name": "PlayerHpText"
+        }
+      ],
+      "Methods": [
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [],
+          "Code": "        -- UI 초기화: 패널 숨기기, 슬라이더 초기값 설정.\n        log(\"[UIManager] OnBeginPlay\")\n        self._T.prevGameState = \"\"\n        self._T.prevPhase = 1\n\n        -- 초기 숨김\n        self:_HideAllPanels()\n\n        -- 슬라이더 초기값\n        if isvalid(self.PlayerHpSlider) then\n            self.PlayerHpSlider.Value = 1.0\n        end\n        if isvalid(self.BossHpSlider) then\n            self.BossHpSlider.Value = 1.0\n        end",
+          "Scope": 2,
+          "ExecSpace": 2,
+          "Attributes": [],
+          "Name": "OnBeginPlay"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [
+            {
+              "Type": "number",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "delta"
+            }
+          ],
+          "Code": "        -- 매 프레임 UI 갱신.\n        self:_UpdateHpBars()\n        self:_CheckStateChange()",
+          "Scope": 2,
+          "ExecSpace": 2,
+          "Attributes": [],
+          "Name": "OnUpdate"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [],
+          "Code": "        -- GameManager의 @Sync 값으로 HP바 갱신.\n\n        -- 보스 HP\n        if isvalid(self.BossHpSlider) then\n            local maxHp = _GameManager.BossMaxHp\n            local curHp = _GameManager.BossCurrentHp\n            if maxHp > 0 then\n                local ratio = curHp / maxHp\n                self.BossHpSlider.Value = ratio\n\n                -- HP 색상 변경\n                if ratio > 0.5 then\n                    self.BossHpSlider.FillRectColor = Color(0.2, 0.8, 0.2, 1)\n                elseif ratio > 0.25 then\n                    self.BossHpSlider.FillRectColor = Color(1.0, 0.7, 0.0, 1)\n                else\n                    self.BossHpSlider.FillRectColor = Color(0.9, 0.1, 0.1, 1)\n                end\n            end\n        end\n\n        -- 보스 HP 텍스트\n        if isvalid(self.BossHpText) then\n            self.BossHpText.Text = tostring(_GameManager.BossCurrentHp) .. \" / \" .. tostring(_GameManager.BossMaxHp)\n        end\n\n        -- 플레이어 HP (로컬 플레이어)\n        local localPlayer = _UserService.LocalPlayer\n        if isvalid(localPlayer) then\n            local pc = localPlayer.PlayerController\n            if isvalid(pc) then\n                local ratio = pc.CurrentHp / pc.MaxHp\n                if isvalid(self.PlayerHpSlider) then\n                    self.PlayerHpSlider.Value = ratio\n                end\n                if isvalid(self.PlayerHpText) then\n                    self.PlayerHpText.Text = tostring(pc.CurrentHp) .. \" / \" .. tostring(pc.MaxHp)\n                end\n            end\n        end",
+          "Scope": 2,
+          "ExecSpace": 2,
+          "Attributes": [],
+          "Name": "_UpdateHpBars"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [],
+          "Code": "        -- GameManager.GameState @Sync 값 변경 감지 후 UI 전환.\n        local state = _GameManager.GameState\n        local phase = _GameManager.BossPhase\n\n        if state ~= self._T.prevGameState then\n            self._T.prevGameState = state\n            self:_OnGameStateChanged(state)\n        end\n\n        if phase ~= self._T.prevPhase then\n            self._T.prevPhase = phase\n            self:_OnPhaseChanged(phase)\n        end",
+          "Scope": 2,
+          "ExecSpace": 2,
+          "Attributes": [],
+          "Name": "_CheckStateChange"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [
+            {
+              "Type": "string",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "state"
+            }
+          ],
+          "Code": "        -- 게임 상태 전환 시 해당 UI 패널 표시.\n        log(\"[UIManager] 상태 변경: \" .. state)\n\n        self:_HideAllPanels()\n\n        if state == \"CLEAR\" then\n            if isvalid(self.ClearPanel) then\n                self.ClearPanel.Enable = true\n            end\n        elseif state == \"GAMEOVER\" then\n            if isvalid(self.GameOverPanel) then\n                self.GameOverPanel.Enable = true\n            end\n        end",
+          "Scope": 2,
+          "ExecSpace": 2,
+          "Attributes": [],
+          "Name": "_OnGameStateChanged"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [
+            {
+              "Type": "integer",
+              "DefaultValue": null,
+              "SyncDirection": 0,
+              "Attributes": [],
+              "Name": "phase"
+            }
+          ],
+          "Code": "        -- 페이즈 변경 시 텍스트 갱신 및 연출.\n        log(\"[UIManager] 페이즈 변경: Phase \" .. tostring(phase))\n        if isvalid(self.PhaseText) then\n            self.PhaseText.Text = \"Phase \" .. tostring(phase)\n        end\n\n        -- Phase 2 돌입 시 경고 메시지 (잠깐 표시)\n        if phase == 2 then\n            self:_ShowPhaseAlert()\n        end",
+          "Scope": 2,
+          "ExecSpace": 2,
+          "Attributes": [],
+          "Name": "_OnPhaseChanged"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [],
+          "Code": "        -- Phase 2 진입 알림 텍스트를 2초간 표시.\n        if not isvalid(self.PhaseText) then return end\n\n        local original = self.PhaseText.Text\n        self.PhaseText.Text = \"⚠ Phase 2 ⚠\"\n        self.PhaseText.FontColor = Color(1, 0.2, 0.2, 1)\n\n        _TimerService:SetTimerOnce(function()\n            if isvalid(self.PhaseText) then\n                self.PhaseText.Text = \"Phase 2\"\n                self.PhaseText.FontColor = Color(1, 1, 1, 1)\n            end\n        end, 2.0)",
+          "Scope": 2,
+          "ExecSpace": 2,
+          "Attributes": [],
+          "Name": "_ShowPhaseAlert"
+        },
+        {
+          "Return": {
+            "Type": "void",
+            "DefaultValue": null,
+            "SyncDirection": 0,
+            "Attributes": [],
+            "Name": null
+          },
+          "Arguments": [],
+          "Code": "        -- 클리어/게임오버 패널을 모두 숨긴다.\n        if isvalid(self.ClearPanel) then\n            self.ClearPanel.Enable = false\n        end\n        if isvalid(self.GameOverPanel) then\n            self.GameOverPanel.Enable = false\n        end",
+          "Scope": 2,
+          "ExecSpace": 2,
+          "Attributes": [],
+          "Name": "_HideAllPanels"
+        }
+      ],
+      "EntityEventHandlers": []
+    }
+  }
+}

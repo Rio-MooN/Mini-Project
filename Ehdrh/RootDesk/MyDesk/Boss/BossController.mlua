@@ -1,0 +1,244 @@
+@Component
+script BossController extends AttackComponent
+
+    -- 보스 최대 HP
+    property integer MaxHp = 1000
+
+    -- Phase 1 공격 쿨다운 (초)
+    property number Phase1AttackCooldown = 2.0
+
+    -- Phase 2 공격 쿨다운 (초)
+    property number Phase2AttackCooldown = 1.2
+
+    -- 보스 이동 속도
+    property number MoveSpeed = 1.5
+
+    -- =====================
+    -- 내부 상태
+    -- =====================
+    -- self._T.lastAttackTime : 마지막 공격 시간
+    -- self._T.currentPhase   : 현재 페이즈 (로컬 캐시)
+    -- self._T.syncHandler    : GameState 변경 감지용
+
+    -- =====================
+    -- 라이프사이클
+    -- =====================
+
+    @ExecSpace("ServerOnly")
+    method void OnBeginPlay()
+        -- 보스 초기화. GameManager에 HP 등록 후 전투 시작.
+        log("[BossController] OnBeginPlay")
+        self._T.lastAttackTime = 0
+        self._T.currentPhase = 1
+
+        -- GameManager에 전투 시작 알림
+        _GameManager:StartBattle(self.MaxHp)
+    end
+
+    @ExecSpace("ServerOnly")
+    method void OnUpdate(number delta)
+        -- 매 프레임: 전투 중일 때만 AI 실행.
+        if not _GameManager:IsBattle() then return end
+        if not isvalid(self.Entity) then return end
+
+        -- 페이즈 동기화
+        self._T.currentPhase = _GameManager.BossPhase
+
+        -- 플레이어 추적 이동
+        self:_MoveTowardPlayer()
+
+        -- 공격 패턴
+        local now = _UtilLogic.ElapsedSeconds
+        local cooldown = self.Phase1AttackCooldown
+        if self._T.currentPhase == 2 then
+            cooldown = self.Phase2AttackCooldown
+        end
+
+        if now - self._T.lastAttackTime >= cooldown then
+            self._T.lastAttackTime = now
+            self:_ExecuteAttackPattern()
+        end
+    end
+
+    @ExecSpace("ServerOnly")
+    method void OnEndPlay()
+        -- 정리
+        log("[BossController] OnEndPlay")
+    end
+
+    -- =====================
+    -- 이동: 플레이어 방향으로
+    -- =====================
+
+    @ExecSpace("ServerOnly")
+    method void _MoveTowardPlayer()
+        -- 가장 가까운 플레이어를 향해 이동.
+        local player = self:_GetNearestPlayer()
+        if player == nil then return end
+
+        local myPos = self.Entity.TransformComponent.WorldPosition
+        local plPos = player.TransformComponent.WorldPosition
+
+        local dx = plPos.x - myPos.x
+        local dy = plPos.y - myPos.y
+        local dist = math.sqrt(dx * dx + dy * dy)
+
+        if dist < 0.5 then return end  -- 너무 가까우면 멈춤
+
+        local movement = self.Entity.MovementComponent
+        if not isvalid(movement) then return end
+
+        movement:MoveToDirection(Vector2(dx / dist, dy / dist), 0)
+    end
+
+    -- =====================
+    -- 공격 패턴 분기
+    -- =====================
+
+    @ExecSpace("ServerOnly")
+    method void _ExecuteAttackPattern()
+        -- 페이즈에 따라 다른 공격 패턴 실행.
+        if self._T.currentPhase == 1 then
+            self:_AttackPhase1()
+        else
+            self:_AttackPhase2()
+        end
+    end
+
+    -- =====================
+    -- Phase 1: 직선 4방향 탄막
+    -- =====================
+
+    @ExecSpace("ServerOnly")
+    method void _AttackPhase1()
+        -- Phase 1 패턴: 4방향 직선 탄막 발사.
+        log("[BossController] Phase1 공격")
+        local pos = self.Entity.TransformComponent.WorldPosition
+
+        local dirs = {
+            {x=1,  y=0},
+            {x=-1, y=0},
+            {x=0,  y=1},
+            {x=0,  y=-1}
+        }
+
+        for _, dir in ipairs(dirs) do
+            _BulletManager:SpawnBossBullet(
+                pos.x, pos.y,
+                dir.x, dir.y,
+                5.0,   -- 속도
+                30     -- 데미지
+            )
+        end
+    end
+
+    -- =====================
+    -- Phase 2: 방사형 8방향 탄막
+    -- =====================
+
+    @ExecSpace("ServerOnly")
+    method void _AttackPhase2()
+        -- Phase 2 패턴: 8방향 방사형 탄막 발사.
+        log("[BossController] Phase2 공격")
+        local pos = self.Entity.TransformComponent.WorldPosition
+
+        local count = 8
+        for i = 0, count - 1 do
+            local angle = (i / count) * 2 * math.pi
+            local dx = math.cos(angle)
+            local dy = math.sin(angle)
+            _BulletManager:SpawnBossBullet(
+                pos.x, pos.y,
+                dx, dy,
+                6.5,   -- Phase 2: 더 빠름
+                40     -- Phase 2: 더 강함
+            )
+        end
+    end
+
+    -- =====================
+    -- 피격 (AttackComponent 오버라이드)
+    -- =====================
+
+    @ExecSpace("ServerOnly")
+    method void OnHit(Entity attacker, integer damage, boolean isCritical, string attackInfo, integer hitCount)
+        -- 보스가 플레이어 투사체에 맞았을 때. GameManager에 데미지 전달.
+        log("[BossController] 피격! 데미지=" .. tostring(damage))
+        _GameManager:OnBossHit(damage)
+
+        -- 사망 체크
+        if _GameManager.BossCurrentHp <= 0 then
+            self:_OnDead()
+        end
+    end
+
+    -- =====================
+    -- 사망 처리
+    -- =====================
+
+    @ExecSpace("ServerOnly")
+    method void _OnDead()
+        -- 보스 사망 연출 후 엔티티 제거.
+        log("[BossController] 보스 사망!")
+        self:_PlayDeathEffect()
+
+        _TimerService:SetTimerOnce(function()
+            if isvalid(self.Entity) then
+                _EntityService:Destroy(self.Entity)
+            end
+        end, 1.5)
+    end
+
+    -- =====================
+    -- 사망 이펙트 (클라이언트)
+    -- =====================
+
+    @ExecSpace("Client")
+    method void _PlayDeathEffect()
+        -- 보스 사망 시 시각 효과.
+        local renderer = self.Entity.SpriteRendererComponent
+        if not isvalid(renderer) then return end
+        renderer:SetAlpha(0.0)
+    end
+
+    -- =====================
+    -- 유틸: 가장 가까운 플레이어 찾기
+    -- =====================
+
+    @ExecSpace("ServerOnly")
+    method any _GetNearestPlayer()
+        -- UserEntities에서 가장 가까운 플레이어 반환.
+        local myPos = self.Entity.TransformComponent.WorldPosition
+        local nearest = nil
+        local nearestDist = 999999
+
+        local users = _UserService.UserEntities
+        for userId, playerEntity in pairs(users) do
+            if isvalid(playerEntity) then
+                local pPos = playerEntity.TransformComponent.WorldPosition
+                local dx = pPos.x - myPos.x
+                local dy = pPos.y - myPos.y
+                local dist = math.sqrt(dx * dx + dy * dy)
+                if dist < nearestDist then
+                    nearestDist = dist
+                    nearest = playerEntity
+                end
+            end
+        end
+
+        return nearest
+    end
+
+    -- =====================
+    -- 데미지 계산 오버라이드
+    -- =====================
+
+    @ExecSpace("ServerOnly")
+    method integer CalcDamage(Entity attacker, Entity defender, string attackInfo)
+        -- 플레이어 투사체 데미지를 attackInfo에서 파싱.
+        -- @param attackInfo : "PlayerBullet:{damage}" 형식
+        local damage = tonumber(attackInfo) or 50
+        return damage
+    end
+
+end

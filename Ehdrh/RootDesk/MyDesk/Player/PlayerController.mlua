@@ -1,0 +1,208 @@
+@Component
+script PlayerController extends Component
+
+    -- 플레이어 최대 HP (@Sync → 모든 클라이언트에 동기화)
+    @Sync
+    property integer MaxHp = 1000
+
+    -- 현재 HP
+    @Sync
+    property integer CurrentHp = 1000
+
+    -- 무적 시간 (초)
+    property number ImmuneCooldown = 1.5
+
+    -- 투사체 발사 쿨다운 (초)
+    property number FireCooldown = 0.3
+
+    -- 투사체 속도
+    property number BulletSpeed = 8.0
+
+    -- 투사체 데미지
+    property integer BulletDamage = 50
+
+    -- =====================
+    -- 내부 상태 (_T: 비동기화 임시값)
+    -- =====================
+    -- self._T.lastHitTime    : 마지막 피격 시간
+    -- self._T.lastFireTime   : 마지막 발사 시간
+    -- self._T.isLocalPlayer  : 로컬 플레이어 여부 (클라이언트에서 판단)
+    -- self._T.hitHandler     : HitEvent 핸들러
+
+    -- =====================
+    -- 라이프사이클
+    -- =====================
+
+    @ExecSpace("ServerOnly")
+    method void OnBeginPlay()
+        -- 서버: HP 초기화 및 HitEvent 연결
+        log("[PlayerController] OnBeginPlay (Server)")
+        self.CurrentHp = self.MaxHp
+        self._T.lastHitTime = 0
+        self._T.lastFireTime = 0
+
+        -- HitEvent 연결 (PlayerHit 컴포넌트가 emit)
+        self._T.hitHandler = self.Entity:ConnectEvent(HitEvent, self._OnHitEvent)
+    end
+
+    @ExecSpace("ClientOnly")
+    method void OnBeginPlay()
+        -- 클라이언트: 로컬 플레이어 여부 확인
+        self._T.isLocalPlayer = (_UserService.LocalPlayer == self.Entity)
+        self._T.lastFireTime = 0
+        log("[PlayerController] OnBeginPlay (Client) isLocal=" .. tostring(self._T.isLocalPlayer))
+    end
+
+    @ExecSpace("ServerOnly")
+    method void OnEndPlay()
+        -- HitEvent 연결 해제
+        if self._T.hitHandler ~= nil then
+            self.Entity:DisconnectEvent(HitEvent, self._T.hitHandler)
+            self._T.hitHandler = nil
+        end
+        log("[PlayerController] OnEndPlay")
+    end
+
+    -- =====================
+    -- 매 프레임 (클라이언트)
+    -- =====================
+
+    @ExecSpace("ClientOnly")
+    method void OnUpdate(number delta)
+        -- 로컬 플레이어만 입력 처리
+        if not self._T.isLocalPlayer then return end
+        if not _GameManager:IsBattle() then return end
+
+        self:_HandleFire(delta)
+    end
+
+    -- =====================
+    -- 투사체 발사 (클라이언트 입력 감지 → 서버 요청)
+    -- =====================
+
+    @ExecSpace("ClientOnly")
+    method void _HandleFire(number delta)
+        -- 클라이언트에서 입력 감지 후 서버에 발사 요청.
+        -- 발사: 마우스 클릭 또는 Space
+        local now = _UtilLogic.ElapsedSeconds
+        if now - self._T.lastFireTime < self.FireCooldown then return end
+
+        -- 방향키 조합으로 발사 방향 결정 (8방향)
+        local dx = 0
+        local dy = 0
+
+        if _InputService:IsKeyDown(KeyCode.RightArrow) then dx = dx + 1 end
+        if _InputService:IsKeyDown(KeyCode.LeftArrow)  then dx = dx - 1 end
+        if _InputService:IsKeyDown(KeyCode.UpArrow)    then dy = dy + 1 end
+        if _InputService:IsKeyDown(KeyCode.DownArrow)  then dy = dy - 1 end
+
+        -- 발사 방향 입력이 있을 때만
+        if dx == 0 and dy == 0 then return end
+
+        -- 대각선 정규화
+        if dx ~= 0 and dy ~= 0 then
+            dx = dx * 0.7071
+            dy = dy * 0.7071
+        end
+
+        self._T.lastFireTime = now
+        self:RequestFire(dx, dy)
+    end
+
+    -- =====================
+    -- 서버 RPC: 발사 요청
+    -- =====================
+
+    @ExecSpace("Server")
+    method void RequestFire(number dirX, number dirY)
+        -- 클라이언트 → 서버: 투사체 발사 요청.
+        -- @param dirX, dirY : 정규화된 발사 방향
+        if not _GameManager:IsBattle() then return end
+
+        local pos = self.Entity.TransformComponent.WorldPosition
+        -- BulletManager에게 스폰 요청
+        _BulletManager:SpawnPlayerBullet(
+            pos.x, pos.y,
+            dirX, dirY,
+            self.BulletSpeed,
+            self.BulletDamage
+        )
+    end
+
+    -- =====================
+    -- 피격 처리 (서버)
+    -- =====================
+
+    @ExecSpace("ServerOnly")
+    method void _OnHitEvent(HitEvent event)
+        -- HitEvent 수신 시 무적 프레임 체크 후 HP 감소.
+        if not _GameManager:IsBattle() then return end
+
+        -- 무적 체크
+        local now = _UtilLogic.ElapsedSeconds
+        if now - self._T.lastHitTime < self.ImmuneCooldown then
+            log("[PlayerController] 무적 중 피격 무시")
+            return
+        end
+
+        self._T.lastHitTime = now
+        local damage = event.TotalDamage
+        self.CurrentHp = self.CurrentHp - damage
+
+        log("[PlayerController] 피격! 데미지=" .. tostring(damage) .. " HP=" .. tostring(self.CurrentHp))
+
+        if self.CurrentHp <= 0 then
+            self.CurrentHp = 0
+            self:_OnDead()
+        else
+            -- 피격 이펙트 (클라이언트)
+            self:_ShowHitEffect()
+        end
+    end
+
+    -- =====================
+    -- 사망 처리
+    -- =====================
+
+    @ExecSpace("ServerOnly")
+    method void _OnDead()
+        -- 플레이어 사망 처리. GameManager에 통보.
+        log("[PlayerController] 플레이어 사망!")
+        self.Entity.PlayerComponent:ProcessDead()
+        _GameManager:OnPlayerDead()
+    end
+
+    -- =====================
+    -- 피격 이펙트 (클라이언트)
+    -- =====================
+
+    @ExecSpace("Client")
+    method void _ShowHitEffect()
+        -- 피격 시 아바타 깜빡임 이펙트.
+        local renderer = self.Entity.AvatarRendererComponent
+        if not isvalid(renderer) then return end
+
+        renderer:SetAlpha(0.3)
+        _TimerService:SetTimerOnce(function()
+            if isvalid(renderer) then
+                renderer:SetAlpha(1.0)
+            end
+        end, 0.2)
+    end
+
+    -- =====================
+    -- HP 복구 (외부 호출용)
+    -- =====================
+
+    @ExecSpace("ServerOnly")
+    method void Heal(integer amount)
+        -- HP를 amount만큼 회복한다.
+        -- @param amount : 회복량
+        self.CurrentHp = self.CurrentHp + amount
+        if self.CurrentHp > self.MaxHp then
+            self.CurrentHp = self.MaxHp
+        end
+        log("[PlayerController] 회복! HP=" .. tostring(self.CurrentHp))
+    end
+
+end

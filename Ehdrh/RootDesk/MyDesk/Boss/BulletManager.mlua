@@ -1,0 +1,120 @@
+@Logic
+script BulletManager extends Logic
+
+    -- 플레이어 투사체 모델 ID (에디터에서 설정)
+    property string PlayerBulletModelId = "model://playerbullet"
+
+    -- 보스 투사체 모델 ID
+    property string BossBulletModelId = "model://bossbullet"
+
+    -- 활성 투사체 카운터 (이름 중복 방지)
+    property integer _bulletCount = 0
+
+    -- =====================
+    -- 라이프사이클
+    -- =====================
+
+    @ExecSpace("ServerOnly")
+    method void OnBeginPlay()
+        -- BulletManager 초기화.
+        log("[BulletManager] OnBeginPlay")
+        self._bulletCount = 0
+    end
+
+    -- =====================
+    -- 플레이어 투사체 스폰
+    -- =====================
+
+    @ExecSpace("ServerOnly")
+    method void SpawnPlayerBullet(number x, number y, number dirX, number dirY, number speed, integer damage)
+        -- 플레이어 투사체를 지정 위치/방향으로 스폰한다.
+        -- @param x, y    : 스폰 위치 (월드 좌표)
+        -- @param dirX, dirY : 정규화된 이동 방향
+        -- @param speed   : 이동 속도 (월드유닛/초)
+        -- @param damage  : 데미지
+        local map = self:_GetCurrentMap()
+        if map == nil then
+            log_warning("[BulletManager] 맵 엔티티를 찾을 수 없습니다.")
+            return
+        end
+
+        self._bulletCount += 1
+        local name = "PlayerBullet_" .. tostring(self._bulletCount)
+        local spawnPos = Vector3(x, y, 0)
+
+        local bullet = _SpawnService:SpawnByModelId(
+            self.PlayerBulletModelId,
+            name,
+            spawnPos,
+            map
+        )
+
+        if not isvalid(bullet) then
+            log_warning("[BulletManager] 플레이어 투사체 스폰 실패: " .. self.PlayerBulletModelId)
+            return
+        end
+
+        -- BulletMover 컴포넌트에 방향/속도/데미지 전달
+        local mover = bullet.BulletMover
+        if isvalid(mover) then
+            mover:Init(dirX, dirY, speed, damage, "player", 4.0)
+        end
+
+        log("[BulletManager] 플레이어 투사체 스폰: " .. name)
+    end
+
+    -- =====================
+    -- 보스 투사체 스폰
+    -- =====================
+
+    @ExecSpace("ServerOnly")
+    method void SpawnBossBullet(number x, number y, number dirX, number dirY, number speed, integer damage)
+        -- 보스 투사체를 지정 위치/방향으로 스폰한다.
+        -- @param x, y    : 스폰 위치 (월드 좌표)
+        -- @param dirX, dirY : 정규화된 이동 방향
+        -- @param speed   : 이동 속도
+        -- @param damage  : 데미지
+        local map = self:_GetCurrentMap()
+        if map == nil then
+            log_warning("[BulletManager] 맵 엔티티를 찾을 수 없습니다.")
+            return
+        end
+
+        self._bulletCount += 1
+        local name = "BossBullet_" .. tostring(self._bulletCount)
+        local spawnPos = Vector3(x, y, 0)
+
+        local bullet = _SpawnService:SpawnByModelId(
+            self.BossBulletModelId,
+            name,
+            spawnPos,
+            map
+        )
+
+        if not isvalid(bullet) then
+            log_warning("[BulletManager] 보스 투사체 스폰 실패: " .. self.BossBulletModelId)
+            return
+        end
+
+        local mover = bullet.BulletMover
+        if isvalid(mover) then
+            mover:Init(dirX, dirY, speed, damage, "boss", 5.0)
+        end
+    end
+
+    -- =====================
+    -- 내부: 현재 맵 가져오기
+    -- =====================
+
+    @ExecSpace("ServerOnly")
+    method any _GetCurrentMap()
+        -- 현재 활성 맵 엔티티를 반환.
+        local maps = _EntityService:GetEntitiesByPath("/maps/map01")
+        if maps ~= nil and #maps > 0 then
+            return maps[1]
+        end
+        log_warning("[BulletManager] /maps/map01 을 찾을 수 없음")
+        return nil
+    end
+
+end
